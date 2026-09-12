@@ -330,17 +330,24 @@ Do ponto de vista de exposição financeira, o problema original ("quais fatores
 
 ## 7. Autoavaliação
 
-> Esta seção deve ser escrita em primeira pessoa, refletindo a sua experiência real no desenvolvimento do trabalho. Abaixo, um roteiro com as perguntas que o edital pede — substitua cada colchete por sua reflexão pessoal.
+### Os objetivos traçados no início do trabalho foram atingidos?
+Sim. O pipeline foi implementado de ponta a ponta seguindo a arquitetura medalhão no Databricks, cobrindo com sucesso desde a ingestão bruta até a disponibilização de tabelas analíticas. As quatro perguntas de negócio formuladas na etapa de planejamento foram integralmente respondidas por meio de consultas analíticas na camada Gold:
 
-**Os objetivos traçados no início do trabalho foram atingidos?**
-`[Das 4 perguntas definidas no objetivo, quantas você conseguiu responder de forma satisfatória? Alguma ficou parcialmente respondida? Por quê?]`
+1. **Taxa geral e corte sociodemográfico:** Determinada a taxa média de inadimplência (8,32%), evidenciando menores taxas para contratos rotativos e relação inversa consistente entre escolaridade e inadimplência.
+2. **Histórico externo (bureau):** Comprovado que clientes com atraso no bureau apresentam taxa de inadimplência significativamente superior (14,42%) àqueles sem atrasos (7,90%).
+3. **Comportamento de pagamento interno:** Confirmada a relação direta e progressiva entre o percentual de parcelas atrasadas anteriormente e o risco de crédito na proposta atual (atingindo 12,71% para quem atrasou mais de 30% das parcelas).
+4. **Distribuição da exposição financeira:** Mapeada a dissociação crítica entre risco relativo (concentrado em perfis jovens com tickets médios) e volume absoluto em risco (concentrado em segmentos de alta renda e crédito elevado, ultrapassando R$ 205 milhões em um único segmento).
 
-**Quais foram as principais dificuldades encontradas durante a execução?**
-`[Ex.: dificuldades com limites de recursos do cluster gratuito — que motivaram o uso da amostra de 13%; curva de aprendizado do PySpark/Databricks; decisões de modelagem; tratamento de valores como o código de erro em DAYS_EMPLOYED, etc.]`
+### Quais foram as principais dificuldades encontradas durante a execução?
+- **Limitações de infraestrutura gratuita:** O processamento conjunto de tabelas volumosas — em especial `installments_payments`, com mais de 13,6 milhões de registros — impôs gargalos de memória e tempo de computação no cluster do Databricks Free Edition. A mitigação adotada foi a extração de uma amostra estratificada reprodutível de 13% dos clientes (`seed=42`), mantendo rigorosa paridade estatística da taxa de inadimplência em relação à base original.
+- **Tratamento de artefatos e anomalias de dados legados:** A presença de códigos sentinela clássicos do dataset (como o valor `365243` em `DAYS_EMPLOYED` e preenchimentos "XNA" em colunas categóricas) exigiu etapas cuidadosas de profilaxia na camada Silver antes de quaisquer agregações numéricas, evitando distorções em métricas temporais.
+- **Inconsistências em registros contábeis externos:** A identificação de saldos devedores negativos em `AMT_CREDIT_SUM_DEBT` no bureau demonstrou a importância de checagens descritivas aprofundadas, evidenciando campos que demandam regras de negócio de contenção ou auditoria adicional na origem.
 
-**O que você faria diferente ou quais trabalhos futuros enriqueceriam esse projeto?**
-`[Ex.: incorporar as demais tabelas do dataset original (POS_CASH_balance, credit_card_balance) para enriquecer o perfil de risco; treinar um modelo preditivo de inadimplência sobre a camada Gold; ampliar a amostra caso um cluster com mais recursos esteja disponível; automatizar a atualização do pipeline.]`
-
+### O que você faria diferente ou quais trabalhos futuros enriqueceriam esse projeto?
+- **Integração de fontes secundárias granulares:** Incorporar as tabelas `POS_CASH_balance` e `credit_card_balance` do dataset original para refinar a visão temporal de curto prazo do cliente antes da concessão.
+- **Tratamento preventivo de inconsistências:** Aplicar tratamentos nativos no pipeline de ingestão Silver para saldos negativos de crédito (ex.: parametrização via `GREATEST(AMT_CREDIT_SUM_DEBT, 0)` ou regras de quarentena de dados com anomalias).
+- **Modelagem Preditiva (Machine Learning):** Utilizar a tabela `gold.perfil_risco_cliente` como feature store para treinar modelos preditivos de propensão ao default (ex.: LightGBM ou XGBoost), avaliando métricas como ROC-AUC e calibrando curvas de corte de crédito.
+- **Automação e Orquestração:** Configurar o fluxo de execução sequencial dos notebooks 01 a 05 via Databricks Workflows ou Apache Airflow, eliminando a execução manual por notebook e estabelecendo alertas automáticos de quebra de contrato de dados e qualidade.
 ---
 
 ## Referências
