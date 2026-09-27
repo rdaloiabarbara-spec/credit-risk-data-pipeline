@@ -1,7 +1,7 @@
-# MVP — Engenharia de Dados: Pipeline de Risco de Crédito na Nuvem
+# MVP de Engenharia de Dados: Pipeline de Risco de Crédito na Nuvem
 
-**Aluna:** Bárbara
-**Curso:** Pós-graduação em Ciência de Dados e Analytics — PUC-Rio
+**Aluna:** Bárbara Rezende D'Aloia
+**Curso:** Pós-graduação em Ciência de Dados e Analytics, PUC-Rio
 **Disciplina:** Engenharia de Dados
 **Repositório:** `credit-risk-data-pipeline`
 **Plataforma utilizada:** Databricks Free Edition (catálogo `credit_risk_pipeline`)
@@ -10,17 +10,17 @@
 
 ## Sumário
 
-1. [Contexto de Negócio e Perguntas (Etapa 2 e 4.1)](#1-contexto-de-negócio-e-perguntas-etapa-2-e-41)
-2. [Carga dos Dados (Etapa 4.2)](#2-carga-dos-dados-etapa-42)
-3. [Modelagem e Catálogo de Dados (Etapa 4.3)](#3-modelagem-e-catálogo-de-dados-etapa-43)
-4. [Pipeline de Dados (Etapa 4.4)](#4-pipeline-de-dados-etapa-44)
-5. [Qualidade de Dados (Etapa 4.5)](#5-qualidade-de-dados-etapa-45)
-6. [Análise de Dados (Etapa 4.5)](#6-análise-de-dados-etapa-45)
+1. [Contexto de Negócio e Perguntas](#1-contexto-de-negócio-e-perguntas)
+2. [Carga dos Dados](#2-carga-dos-dados)
+3. [Modelagem e Catálogo de Dados](#3-modelagem-e-catálogo-de-dados)
+4. [Pipeline de Dados](#4-pipeline-de-dados)
+5. [Qualidade de Dados](#5-qualidade-de-dados)
+6. [Análise de Dados](#6-análise-de-dados)
 7. [Autoavaliação](#7-autoavaliação)
 
 ---
 
-## 1. Contexto de Negócio e Perguntas (Etapa 2 e 4.1)
+## 1. Contexto de Negócio e Perguntas
 
 ### Problema
 
@@ -39,7 +39,7 @@ Este MVP constrói um pipeline de dados de ponta a ponta que organiza informaç�
 
 Os dados utilizados vêm do dataset **Home Credit Default Risk**, disponibilizado pela Kaggle (competição hospedada pela Home Credit Group): https://www.kaggle.com/c/home-credit-default-risk
 
-**Licença:** o dataset está sob os termos "Subject to Competition Rules" da Kaggle — uso liberado para fins educacionais, acadêmicos e de pesquisa dentro do escopo da competição, sem permissão para redistribuição comercial dos dados brutos. Este trabalho tem finalidade estritamente acadêmica (MVP da disciplina de Engenharia de Dados).
+**Licença:** o dataset está sob os termos "Subject to Competition Rules" da Kaggle, com uso liberado para fins educacionais, acadêmicos e de pesquisa dentro do escopo da competição, sem permissão para redistribuição comercial dos dados brutos. Este trabalho tem finalidade estritamente acadêmica (MVP da disciplina de Engenharia de Dados).
 
 ### Estrutura dos dados brutos
 
@@ -54,31 +54,31 @@ Foram utilizados 4 dos arquivos CSV originais do dataset:
 
 ---
 
-## 2. Carga dos Dados (Etapa 4.2)
+## 2. Carga dos Dados
 
 Os 4 arquivos CSV foram enviados para um Volume do Unity Catalog (`/Volumes/credit_risk_pipeline/bronze/raw_files/`) e, em seguida, ingeridos via PySpark no notebook [`01_bronze_ingestao.ipynb`](./01_bronze_ingestao.ipynb).
 
 O processo de ingestão:
 - Lê cada CSV com inferência automática de schema (`inferSchema`) e cabeçalho (`header`).
 - Adiciona duas colunas de controle de metadados: `_ingestion_timestamp` (data/hora da ingestão) e `_source_file` (nome do arquivo de origem), garantindo rastreabilidade.
-- Grava cada arquivo como uma tabela Delta separada no schema `bronze`, sem qualquer alteração de valores — preservando os dados exatamente como vieram da fonte.
+- Grava cada arquivo como uma tabela Delta separada no schema `bronze`, sem qualquer alteração de valores, preservando os dados exatamente como vieram da fonte.
 
 Tabelas geradas: `credit_risk_pipeline.bronze.application`, `bureau`, `previous_application`, `installments_payments`.
 
 ![Execução da ingestão Bronze, mostrando a quantidade de linhas carregadas em cada tabela](./imagens/01_bronze_execucao_ingestao.png)
-*Execução do notebook `01_bronze_ingestao.ipynb`: os 4 arquivos CSV originais foram carregados com sucesso — `application` (307.511 linhas), `bureau` (1.716.428 linhas), `previous_application` (1.670.214 linhas) e `installments_payments` (13.605.401 linhas).*
+*Execução do notebook `01_bronze_ingestao.ipynb`: os 4 arquivos CSV originais foram carregados com sucesso: `application` (307.511 linhas), `bureau` (1.716.428 linhas), `previous_application` (1.670.214 linhas) e `installments_payments` (13.605.401 linhas).*
 
 ---
 
-## 3. Modelagem e Catálogo de Dados (Etapa 4.3)
+## 3. Modelagem e Catálogo de Dados
 
 ### Estratégia de modelagem
 
-Para viabilizar o processamento dentro dos limites do Databricks Free Edition, foi extraída uma **amostra de 13% dos clientes** (`credit_risk_pipeline.silver.clientes_amostra`) a partir da tabela `bronze.application`, com seed fixa (`seed=42`) para reprodutibilidade. Essa amostra foi validada comparando a taxa de inadimplência da base completa com a da amostra, confirmando que a proporção de clientes inadimplentes (`TARGET`) se manteve equivalente — preservando a representatividade estatística do recorte.
+Para viabilizar o processamento dentro dos limites do Databricks Free Edition, foi extraída uma **amostra de 13% dos clientes** (`credit_risk_pipeline.silver.clientes_amostra`) a partir da tabela `bronze.application`, com seed fixa (`seed=42`) para reprodutibilidade. Essa amostra foi validada comparando a taxa de inadimplência da base completa com a da amostra, confirmando que a proporção de clientes inadimplentes (`TARGET`) se manteve equivalente, preservando a representatividade estatística do recorte.
 
 Todas as demais tabelas Silver e Gold foram construídas a partir dessa amostra de clientes, unida (`join`) às tabelas Bronze correspondentes.
 
-O modelo segue uma lógica próxima ao **Esquema Estrela**: a tabela `gold.perfil_risco_cliente` funciona como uma visão consolidada por cliente (uma linha por `SK_ID_CURR`), enriquecida com métricas agregadas de bureau, propostas anteriores e pagamentos — e a tabela `gold.indicadores_risco` funciona como uma tabela fato agregada por segmento (faixa etária × faixa de renda × faixa de valor de crédito).
+O modelo segue uma lógica próxima ao **Esquema Estrela**: a tabela `gold.perfil_risco_cliente` funciona como uma visão consolidada por cliente (uma linha por `SK_ID_CURR`), enriquecida com métricas agregadas de bureau, propostas anteriores e pagamentos, e a tabela `gold.indicadores_risco` funciona como uma tabela fato agregada por segmento (faixa etária × faixa de renda × faixa de valor de crédito).
 
 ### Catálogo de Dados
 
@@ -172,7 +172,7 @@ Visão consolidada de risco por cliente (uma linha por `SK_ID_CURR`), combinando
 
 | Campo | Tipo | Descrição / Domínio |
 |---|---|---|
-| *(todas as colunas de `silver.application`)* | — | Herdadas da tabela de perfil do cliente |
+| *(todas as colunas de `silver.application`)* | N/A | Herdadas da tabela de perfil do cliente |
 | qtd_creditos_bureau | inteiro | Quantidade de créditos externos registrados (0 se nenhum) |
 | qtd_creditos_ativos_bureau | inteiro | Quantidade de créditos externos ativos |
 | atraso_medio_dias_bureau | decimal | Média de dias de atraso nos créditos externos (nulo se sem histórico) |
@@ -208,7 +208,7 @@ Tabela fato agregada por segmento, para análise de exposição financeira.
 
 ---
 
-## 4. Pipeline de Dados (Etapa 4.4)
+## 4. Pipeline de Dados
 
 O pipeline foi ramificado em **5 notebooks**, cada um representando uma etapa lógica da arquitetura medalhão, disponíveis no repositório:
 
@@ -220,15 +220,24 @@ O pipeline foi ramificado em **5 notebooks**, cada um representando uma etapa l�
 | [`04_qualidade_dados.ipynb`](./04_qualidade_dados.ipynb) | Verificação de qualidade das tabelas Silver (completude, unicidade, acurácia/outliers). |
 | [`05_analise_final.ipynb`](./05_analise_final.ipynb) | Consultas SQL sobre a camada Gold respondendo cada uma das 4 perguntas de negócio. |
 
-Optei por ramificar em notebooks separados (em vez de um único notebook monolítico) para manter cada etapa da arquitetura medalhão isolada e fácil de reexecutar independentemente — por exemplo, se a lógica de qualidade de dados precisar ser ajustada, não é necessário reprocessar a ingestão Bronze novamente.
+Optei por ramificar em notebooks separados (em vez de um único notebook monolítico) para manter cada etapa da arquitetura medalhão isolada e fácil de reexecutar independentemente. Por exemplo, se a lógica de qualidade de dados precisar ser ajustada, não é necessário reprocessar a ingestão Bronze novamente.
 
 Todas as tabelas são persistidas como tabelas Delta gerenciadas dentro do catálogo `credit_risk_pipeline`, organizadas nos schemas `bronze`, `silver` e `gold`.
 
-A evidência de execução e persistência das tabelas Bronze está no print da Seção 2 acima. As tabelas Silver e Gold seguem o mesmo padrão de execução (`saveAsTable` com print da contagem de linhas ao final de cada célula) e podem ser conferidas no próprio Unity Catalog, navegando até os schemas `silver` e `gold` do catálogo `credit_risk_pipeline`.
+As tabelas Silver e Gold seguem o mesmo padrão de execução (`saveAsTable` com print da contagem de linhas ao final de cada célula). A evidência de execução e persistência de cada camada está nos prints abaixo, um para cada schema do catálogo `credit_risk_pipeline`.
+
+![Tabelas persistidas no schema bronze](./imagens/02_unity_catalog_bronze.png)
+*Catalog Explorer do Databricks: schema `bronze`, com as 4 tabelas Delta criadas a partir da ingestão inicial.*
+
+![Tabelas persistidas no schema silver](./imagens/02b_unity_catalog_silver.png)
+*Catalog Explorer do Databricks: schema `silver`, com as 5 tabelas persistidas (as 4 tabelas tratadas descritas na Seção 3, mais `clientes_amostra`, usada como base da amostragem).*
+
+![Tabelas persistidas no schema gold](./imagens/02c_unity_catalog_gold.png)
+*Catalog Explorer do Databricks: schema `gold`, com as 2 tabelas finais, `perfil_risco_cliente` e `indicadores_risco`.*
 
 ---
 
-## 5. Qualidade de Dados (Etapa 4.5)
+## 5. Qualidade de Dados
 
 A verificação de qualidade foi feita no notebook [`04_qualidade_dados.ipynb`](./04_qualidade_dados.ipynb), cobrindo as 4 tabelas da camada Silver, avaliando:
 
@@ -241,19 +250,19 @@ A verificação de qualidade foi feita no notebook [`04_qualidade_dados.ipynb`](
 
 | Problema encontrado | Tabela | Tratamento aplicado |
 |---|---|---|
-| Valor `DAYS_EMPLOYED = 365243` — código de erro conhecido do dataset original, usado quando o campo não se aplica (ex.: aposentados) | `silver.application` | Convertido para nulo antes de calcular `anos_empregado`, evitando distorcer a estatística (365243 dias equivaleriam a ~1000 anos de emprego) |
-| Categoria "XNA" (não informado) em colunas como gênero e tipo de organização | `silver.application`, `silver.previous_application` | Substituído por nulo, para não ser tratado como uma categoria válida nas análises — a checagem de qualidade confirmou 0 ocorrências de "XNA" remanescentes nas colunas categóricas de `application`, validando que o tratamento aplicado na Silver funcionou |
+| Valor `DAYS_EMPLOYED = 365243`, código de erro conhecido do dataset original, usado quando o campo não se aplica (ex.: aposentados) | `silver.application` | Convertido para nulo antes de calcular `anos_empregado`, evitando distorcer a estatística (365243 dias equivaleriam a ~1000 anos de emprego) |
+| Categoria "XNA" (não informado) em colunas como gênero e tipo de organização | `silver.application`, `silver.previous_application` | Substituído por nulo, para não ser tratado como uma categoria válida nas análises. A checagem de qualidade confirmou 0 ocorrências de "XNA" remanescentes nas colunas categóricas de `application`, validando que o tratamento aplicado na Silver funcionou |
 | Valores nulos em colunas financeiras do bureau (dívida, atraso) quando o cliente não possui registro correspondente | `silver.bureau` | Preenchidos com 0, já que ausência de registro representa ausência de dívida/atraso, e não dado faltante por erro |
-| Nenhuma duplicata de chave encontrada em nenhuma das 4 tabelas | `silver.application`, `silver.bureau`, `silver.previous_application` | Verificado: 0 duplicatas em `SK_ID_CURR` (39.773 clientes), 0 em `SK_ID_BUREAU` (189.943 registros) e 0 em `SK_ID_PREV` (182.730 propostas) — não foi necessário nenhum tratamento |
-| Outlier em `AMT_INCOME_TOTAL`: valor máximo de **R$ 18.000.090**, muito acima da mediana (R$ 147.150) e do 75º percentil (R$ 202.500) | `silver.application` | Identificado na análise descritiva; mantido na base sem remoção, mas sinalizado como outlier a ser considerado com cautela em análises estatísticas sensíveis a valores extremos (ex.: médias). As demais colunas numéricas (`AMT_CREDIT`, `AMT_ANNUITY`, `idade_anos`) não apresentaram valores fora do esperado — idades entre 21 e 69 anos, valores de crédito e parcela em faixas plausíveis |
-| Outlier em `CREDIT_DAY_OVERDUE`: valor máximo de **2.754 dias** (~7,5 anos) de atraso em um crédito externo, enquanto a mediana é 0 | `silver.bureau` | Mantido na base (representa um caso real de inadimplência extrema), mas sinalizado como outlier — a grande maioria dos registros (75º percentil = 0) não apresenta atraso algum, o que é coerente com o esperado |
-| Inconsistência lógica em `AMT_CREDIT_SUM_DEBT`: valor mínimo **negativo** (R$ -440.426,84), o que não faz sentido para um saldo devedor | `silver.bureau` | **Identificado, mas ainda não corrigido na versão atual do pipeline.** Recomenda-se tratar como um erro de lançamento na fonte (possível estorno ou erro de sinal) — como trabalho futuro, aplicar `GREATEST(AMT_CREDIT_SUM_DEBT, 0)` ou investigar a causa antes de usar essa coluna em análises agregadas |
-| Outlier em `atraso_dias`: valores extremos em ambas as direções — mínimo de **-1.335 dias** (parcela paga com mais de 3 anos de antecedência) e máximo de **2.737 dias** (~7,5 anos de atraso) | `silver.installments_payments` | Mantidos na base; a mediana de -6 dias mostra que, tipicamente, os clientes pagam poucos dias antes do vencimento, o que é o padrão esperado — os extremos são sinalizados como outliers pontuais, não como um padrão sistêmico |
+| Nenhuma duplicata de chave encontrada em nenhuma das 4 tabelas | `silver.application`, `silver.bureau`, `silver.previous_application` | Verificado: 0 duplicatas em `SK_ID_CURR` (39.773 clientes), 0 em `SK_ID_BUREAU` (189.943 registros) e 0 em `SK_ID_PREV` (182.730 propostas). Não foi necessário nenhum tratamento |
+| Outlier em `AMT_INCOME_TOTAL`: valor máximo de **R$ 18.000.090**, muito acima da mediana (R$ 147.150) e do 75º percentil (R$ 202.500) | `silver.application` | Identificado na análise descritiva; mantido na base sem remoção, mas sinalizado como outlier a ser considerado com cautela em análises estatísticas sensíveis a valores extremos (ex.: médias). As demais colunas numéricas (`AMT_CREDIT`, `AMT_ANNUITY`, `idade_anos`) não apresentaram valores fora do esperado: idades entre 21 e 69 anos, valores de crédito e parcela em faixas plausíveis |
+| Outlier em `CREDIT_DAY_OVERDUE`: valor máximo de **2.754 dias** (~7,5 anos) de atraso em um crédito externo, enquanto a mediana é 0 | `silver.bureau` | Mantido na base (representa um caso real de inadimplência extrema), mas sinalizado como outlier. A grande maioria dos registros (75º percentil = 0) não apresenta atraso algum, o que é coerente com o esperado |
+| Inconsistência lógica em `AMT_CREDIT_SUM_DEBT`: valor mínimo **negativo** (R$ -440.426,84), o que não faz sentido para um saldo devedor | `silver.bureau` | **Identificado, mas ainda não corrigido na versão atual do pipeline.** Recomenda-se tratar como um erro de lançamento na fonte (possível estorno ou erro de sinal). Como trabalho futuro, aplicar `GREATEST(AMT_CREDIT_SUM_DEBT, 0)` ou investigar a causa antes de usar essa coluna em análises agregadas |
+| Outlier em `atraso_dias`: valores extremos em ambas as direções, mínimo de **-1.335 dias** (parcela paga com mais de 3 anos de antecedência) e máximo de **2.737 dias** (~7,5 anos de atraso) | `silver.installments_payments` | Mantidos na base; a mediana de -6 dias mostra que, tipicamente, os clientes pagam poucos dias antes do vencimento, o que é o padrão esperado. Os extremos são sinalizados como outliers pontuais, não como um padrão sistêmico |
 
-**Completude:** todas as colunas de `silver.application` apresentaram completude praticamente total, exceto `CODE_GENDER`, com apenas ~0,25% de valores nulos — percentual residual e sem impacto relevante nas análises. As demais tabelas (`bureau`, `previous_application`, `installments_payments`) não apresentaram problemas de completude relevantes nas colunas numéricas analisadas.
+**Completude:** todas as colunas de `silver.application` apresentaram completude praticamente total, exceto `CODE_GENDER`, com apenas ~0,25% de valores nulos, percentual residual e sem impacto relevante nas análises. As demais tabelas (`bureau`, `previous_application`, `installments_payments`) não apresentaram problemas de completude relevantes nas colunas numéricas analisadas.
 
 ![Checagem de completude, duplicatas e estatísticas descritivas da tabela silver.application](./imagens/10_qualidade_application.png)
-*Resultado da checagem de qualidade de `silver.application`: completude por coluna (destaque para `CODE_GENDER`, único campo com nulos), 0 clientes duplicados de 39.773, e o `summary` estatístico de renda, crédito, parcela e idade — evidenciando o outlier no valor máximo de `AMT_INCOME_TOTAL`.*
+*Resultado da checagem de qualidade de `silver.application`: completude por coluna (destaque para `CODE_GENDER`, único campo com nulos), 0 clientes duplicados de 39.773, e o `summary` estatístico de renda, crédito, parcela e idade, evidenciando o outlier no valor máximo de `AMT_INCOME_TOTAL`.*
 
 ![Confirmação de que não restaram valores 'XNA' nas colunas categóricas de application](./imagens/11_qualidade_xna_ok.png)
 *Verificação de consistência categórica: nenhuma linha impressa significa que a contagem de "XNA" deu zero em todas as colunas categóricas de `application`, confirmando que o tratamento aplicado na camada Silver funcionou.*
@@ -267,37 +276,37 @@ A verificação de qualidade foi feita no notebook [`04_qualidade_dados.ipynb`](
 *`silver.previous_application`: 0 duplicatas em `SK_ID_PREV` (182.730 propostas). Valores de `AMT_APPLICATION`, `AMT_CREDIT` e `AMT_ANNUITY` dentro de faixas plausíveis.*
 
 ![Estatísticas descritivas detalhadas da tabela installments_payments](./imagens/15_qualidade_installments_summary.png)
-*`silver.installments_payments`: valores de `atraso_dias` variando de -1.335 (pagamento muito antecipado) a 2.737 dias (atraso extremo) — a mediana de -6 dias confirma que o padrão típico é o pagamento poucos dias antes do vencimento.*
+*`silver.installments_payments`: valores de `atraso_dias` variando de -1.335 (pagamento muito antecipado) a 2.737 dias (atraso extremo). A mediana de -6 dias confirma que o padrão típico é o pagamento poucos dias antes do vencimento.*
 
 ---
 
-## 6. Análise de Dados (Etapa 4.5)
+## 6. Análise de Dados
 
 As consultas abaixo foram executadas em SQL diretamente sobre a camada Gold, no notebook [`05_analise_final.ipynb`](./05_analise_final.ipynb).
 
-### Pergunta 1 — Qual a taxa geral de inadimplência e como ela varia por tipo de contrato e escolaridade?
+### Pergunta 1: qual a taxa geral de inadimplência e como ela varia por tipo de contrato e escolaridade?
 
 Foi calculada a taxa geral de inadimplência (`AVG(TARGET)`) sobre `gold.perfil_risco_cliente`, seguida da mesma métrica segmentada por `NAME_CONTRACT_TYPE` e por `NAME_EDUCATION_TYPE`.
 
 **Resultado:** a taxa geral de inadimplência na amostra é de **8,32%**.
 
-Por tipo de contrato, clientes com "Cash loans" (35.888 clientes) têm taxa de inadimplência de **8,6%**, superior à dos clientes com "Revolving loans" (3.885 clientes), de **5,77%** — sugerindo que o crédito rotativo, apesar de mais flexível, está associado a um perfil de cliente com menor risco de inadimplência nesta base.
+Por tipo de contrato, clientes com "Cash loans" (35.888 clientes) têm taxa de inadimplência de **8,6%**, superior à dos clientes com "Revolving loans" (3.885 clientes), de **5,77%**, sugerindo que o crédito rotativo, apesar de mais flexível, está associado a um perfil de cliente com menor risco de inadimplência nesta base.
 
-Por escolaridade, a taxa cai de forma consistente conforme aumenta o nível educacional: "Lower secondary" tem a maior taxa (**13,98%**, mas com apenas 465 clientes), seguido por "Secondary / secondary special" (**9,09%**, 28.242 clientes), "Incomplete higher" (**8,31%**), "Higher education" (**5,84%**, 9.723 clientes) e "Academic degree" (**0%**, mas apenas 19 clientes — amostra pequena demais para generalizar). Há uma correlação clara entre maior escolaridade e menor risco de inadimplência.
+Por escolaridade, a taxa cai de forma consistente conforme aumenta o nível educacional: "Lower secondary" tem a maior taxa (**13,98%**, mas com apenas 465 clientes), seguido por "Secondary / secondary special" (**9,09%**, 28.242 clientes), "Incomplete higher" (**8,31%**), "Higher education" (**5,84%**, 9.723 clientes) e "Academic degree" (**0%**, mas apenas 19 clientes, amostra pequena demais para generalizar). Há uma correlação clara entre maior escolaridade e menor risco de inadimplência.
 
 ![Resultado da taxa geral de inadimplência](./imagens/03_pergunta1_taxa_geral.png)
 ![Resultado da taxa de inadimplência por tipo de contrato](./imagens/04_pergunta1_tipo_contrato.png)
 ![Resultado da taxa de inadimplência por escolaridade](./imagens/05_pergunta1_escolaridade.png)
 
-### Pergunta 2 — Atraso no bureau está associado a maior inadimplência atual?
+### Pergunta 2: atraso no bureau está associado a maior inadimplência atual?
 
-Os clientes foram agrupados em três categorias — sem histórico no bureau, com atraso médio no bureau, e sem atraso — comparando a taxa de inadimplência (`TARGET`) entre os grupos.
+Os clientes foram agrupados em três categorias (sem histórico no bureau, com atraso médio no bureau, e sem atraso), comparando a taxa de inadimplência (`TARGET`) entre os grupos.
 
-**Resultado:** clientes com atraso médio registrado no bureau (437 clientes) apresentam a maior taxa de inadimplência, **14,42%** — quase o dobro da taxa de clientes sem atraso no bureau (33.633 clientes, **7,9%**). Clientes sem histórico algum no bureau (5.703 clientes) ficam numa posição intermediária, com **10,38%**. Isso confirma a hipótese: histórico de atraso em outras instituições é um forte indicador de risco de inadimplência no crédito atual, e mesmo a ausência completa de histórico já é um sinal de risco levemente maior do que um histórico limpo.
+**Resultado:** clientes com atraso médio registrado no bureau (437 clientes) apresentam a maior taxa de inadimplência, **14,42%**, quase o dobro da taxa de clientes sem atraso no bureau (33.633 clientes, **7,9%**). Clientes sem histórico algum no bureau (5.703 clientes) ficam numa posição intermediária, com **10,38%**. Isso confirma a hipótese: histórico de atraso em outras instituições é um forte indicador de risco de inadimplência no crédito atual, e mesmo a ausência completa de histórico já é um sinal de risco levemente maior do que um histórico limpo.
 
 ![Resultado da taxa de inadimplência por grupo de atraso no bureau](./imagens/06_pergunta2_bureau.png)
 
-### Pergunta 3 — Comportamento de pagamento anterior está associado a maior risco atual?
+### Pergunta 3: comportamento de pagamento anterior está associado a maior risco atual?
 
 Os clientes foram segmentados por percentual de parcelas atrasadas em propostas anteriores (nunca atrasou, atrasou até 30%, atrasou mais de 30%, ou sem histórico), comparando a taxa de inadimplência atual entre os grupos.
 
@@ -305,13 +314,13 @@ Os clientes foram segmentados por percentual de parcelas atrasadas em propostas 
 
 ![Resultado da taxa de inadimplência por grupo de comportamento de pagamento](./imagens/07_pergunta3_pagamento.png)
 
-### Pergunta 4 — Como a exposição financeira se distribui entre segmentos de idade, renda e valor de crédito?
+### Pergunta 4: como a exposição financeira se distribui entre segmentos de idade, renda e valor de crédito?
 
 Foi consultada a tabela `gold.indicadores_risco`, ordenada pela exposição em risco (`exposicao_em_risco`), destacando os 10 segmentos com maior valor financeiro concedido a clientes que se tornaram inadimplentes.
 
-**Resultado:** o segmento com maior **exposição absoluta em risco** é "30 a 44 anos / renda alta / crédito alto", com R$ 205,8 milhões concedidos a clientes que se tornaram inadimplentes — mesmo com uma taxa de inadimplência relativamente baixa (6,79%). Isso acontece porque esse segmento concentra os maiores valores de crédito concedido (R$ 3,19 bilhões no total), então mesmo uma taxa de inadimplência moderada gera um volume financeiro em risco muito alto.
+**Resultado:** o segmento com maior **exposição absoluta em risco** é "30 a 44 anos / renda alta / crédito alto", com R$ 205,8 milhões concedidos a clientes que se tornaram inadimplentes, mesmo com uma taxa de inadimplência relativamente baixa (6,79%). Isso acontece porque esse segmento concentra os maiores valores de crédito concedido (R$ 3,19 bilhões no total), então mesmo uma taxa de inadimplência moderada gera um volume financeiro em risco muito alto.
 
-Já em termos de **taxa relativa de inadimplência**, o segmento de maior risco entre os 10 com maior exposição é "até 29 anos / renda média / crédito médio", com taxa de **15,02%** — o dobro da média geral (8,32%). De forma geral, clientes mais jovens e com valores de crédito médios (não os mais altos) tendem a concentrar as maiores taxas relativas de inadimplência, enquanto os maiores volumes financeiros em risco absoluto estão nos segmentos de renda alta e crédito alto, por conta do tamanho do valor concedido.
+Já em termos de **taxa relativa de inadimplência**, o segmento de maior risco entre os 10 com maior exposição é "até 29 anos / renda média / crédito médio", com taxa de **15,02%**, o dobro da média geral (8,32%). De forma geral, clientes mais jovens e com valores de crédito médios (não os mais altos) tendem a concentrar as maiores taxas relativas de inadimplência, enquanto os maiores volumes financeiros em risco absoluto estão nos segmentos de renda alta e crédito alto, por conta do tamanho do valor concedido.
 
 Isso sugere que uma política de concessão de crédito precisa olhar para dois eixos separados: o volume financeiro exposto (concentrado em clientes de renda/crédito alto) e o risco relativo por cliente (concentrado em clientes mais jovens com crédito de valor médio).
 
@@ -322,9 +331,9 @@ Isso sugere que uma política de concessão de crédito precisa olhar para dois 
 
 ### Discussão geral
 
-As quatro análises, em conjunto, indicam que o **histórico comportamental do cliente** (atraso no bureau e atraso em parcelas anteriores) é um sinal de risco mais forte e mais consistente do que o perfil sociodemográfico isolado. Enquanto a escolaridade e o tipo de contrato mostram diferenças moderadas na taxa de inadimplência (entre ~6% e ~14%), o histórico de pagamento evidencia uma progressão quase linear e mais acentuada: de 5,88% (sem histórico) a 12,71% (atraso recorrente), e de 7,9% (sem atraso no bureau) a 14,42% (com atraso no bureau) — quase o dobro.
+As quatro análises, em conjunto, indicam que o **histórico comportamental do cliente** (atraso no bureau e atraso em parcelas anteriores) é um sinal de risco mais forte e mais consistente do que o perfil sociodemográfico isolado. Enquanto a escolaridade e o tipo de contrato mostram diferenças moderadas na taxa de inadimplência (entre ~6% e ~14%), o histórico de pagamento evidencia uma progressão quase linear e mais acentuada: de 5,88% (sem histórico) a 12,71% (atraso recorrente), e de 7,9% (sem atraso no bureau) a 14,42% (com atraso no bureau), quase o dobro.
 
-Do ponto de vista de exposição financeira, o problema original ("quais fatores mais influenciam o risco de crédito") ganha uma camada adicional de nuance: os clientes com maior risco relativo (jovens, renda/crédito médios) não são necessariamente os que representam o maior volume financeiro em risco — esse volume está concentrado nos clientes de maior renda e maior valor de crédito, simplesmente por operarem valores maiores. Uma política de concessão de crédito eficaz precisaria, portanto, combinar o histórico comportamental (bureau e pagamentos) com o dimensionamento do valor concedido por segmento, e não decidir com base apenas no perfil demográfico do cliente.
+Do ponto de vista de exposição financeira, o problema original ("quais fatores mais influenciam o risco de crédito") ganha uma camada adicional de nuance: os clientes com maior risco relativo (jovens, renda/crédito médios) não são necessariamente os que representam o maior volume financeiro em risco. Esse volume está concentrado nos clientes de maior renda e maior valor de crédito, simplesmente por operarem valores maiores. Uma política de concessão de crédito eficaz precisaria, portanto, combinar o histórico comportamental (bureau e pagamentos) com o dimensionamento do valor concedido por segmento, e não decidir com base apenas no perfil demográfico do cliente.
 
 ---
 
@@ -339,7 +348,7 @@ Sim. O pipeline foi implementado de ponta a ponta seguindo a arquitetura medalh�
 4. **Distribuição da exposição financeira:** Mapeada a dissociação crítica entre risco relativo (concentrado em perfis jovens com tickets médios) e volume absoluto em risco (concentrado em segmentos de alta renda e crédito elevado, ultrapassando R$ 205 milhões em um único segmento).
 
 ### Quais foram as principais dificuldades encontradas durante a execução?
-- **Limitações de infraestrutura gratuita:** O processamento conjunto de tabelas volumosas — em especial `installments_payments`, com mais de 13,6 milhões de registros — impôs gargalos de memória e tempo de computação no cluster do Databricks Free Edition. A mitigação adotada foi a extração de uma amostra estratificada reprodutível de 13% dos clientes (`seed=42`), mantendo rigorosa paridade estatística da taxa de inadimplência em relação à base original.
+- **Limitações de infraestrutura gratuita:** O processamento conjunto de tabelas volumosas (em especial `installments_payments`, com mais de 13,6 milhões de registros) impôs gargalos de memória e tempo de computação no cluster do Databricks Free Edition. A mitigação adotada foi a extração de uma amostra estratificada reprodutível de 13% dos clientes (`seed=42`), mantendo rigorosa paridade estatística da taxa de inadimplência em relação à base original.
 - **Tratamento de artefatos e anomalias de dados legados:** A presença de códigos sentinela clássicos do dataset (como o valor `365243` em `DAYS_EMPLOYED` e preenchimentos "XNA" em colunas categóricas) exigiu etapas cuidadosas de profilaxia na camada Silver antes de quaisquer agregações numéricas, evitando distorções em métricas temporais.
 - **Inconsistências em registros contábeis externos:** A identificação de saldos devedores negativos em `AMT_CREDIT_SUM_DEBT` no bureau demonstrou a importância de checagens descritivas aprofundadas, evidenciando campos que demandam regras de negócio de contenção ou auditoria adicional na origem.
 
@@ -352,6 +361,6 @@ Sim. O pipeline foi implementado de ponta a ponta seguindo a arquitetura medalh�
 
 ## Referências
 
-- Dataset: [Home Credit Default Risk — Kaggle](https://www.kaggle.com/c/home-credit-default-risk)
+- Dataset: [Home Credit Default Risk, Kaggle](https://www.kaggle.com/c/home-credit-default-risk)
 - Plataforma: [Databricks Free Edition](https://www.databricks.com/learn/free-edition)
-- Arquitetura: [Medallion Architecture — Databricks Documentation](https://www.databricks.com/glossary/medallion-architecture)
+- Arquitetura: [Medallion Architecture, Databricks Documentation](https://www.databricks.com/glossary/medallion-architecture)
